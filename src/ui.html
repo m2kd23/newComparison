@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>신구조문대비표 생성기</title>
+<style>
+  :root { --bd:#c9ced6; --bg:#f4f6f8; --fg:#1d232b; --muted:#5d6773; --acc:#1f5fbf; --warn:#a15c00; --err:#b3261e; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "맑은 고딕","Malgun Gothic",sans-serif; font-size:14px; color:var(--fg); background:var(--bg); }
+  header { background:#fff; border-bottom:1px solid var(--bd); padding:12px 20px; display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header span { color:var(--muted); font-size:12.5px; }
+  main { padding:16px 20px 40px; max-width:1500px; margin:0 auto; }
+  .inputs { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .box { background:#fff; border:1px solid var(--bd); border-radius:6px; padding:10px 12px; }
+  .box h2 { font-size:14px; margin:0 0 6px; display:flex; justify-content:space-between; align-items:center; }
+  .box h2 small { font-weight:normal; color:var(--muted); font-size:12px; }
+  textarea { width:100%; height:260px; resize:vertical; font-family:"맑은 고딕",monospace; font-size:12.5px; line-height:1.45; border:1px solid var(--bd); border-radius:4px; padding:8px; }
+  .summary { font-size:12.5px; margin-top:6px; color:var(--muted); min-height:18px; }
+  .summary b { color:var(--fg); }
+  .summary .w { color:var(--warn); }
+  .opts { margin-top:14px; display:grid; grid-template-columns:minmax(180px,0.7fr) 1.3fr 1.5fr; gap:0; padding:0; }
+  .optgrp { padding:10px 16px; display:flex; flex-direction:column; gap:7px; }
+  .optgrp + .optgrp { border-left:1px solid var(--bd); }
+  .optttl { font-size:12px; font-weight:bold; color:var(--muted); margin-bottom:1px; }
+  .opts label { display:flex; align-items:center; gap:6px; line-height:1.35; }
+  .opts .fmt { display:flex; flex-direction:column; gap:7px; }
+  .opts .fmt label { justify-content:space-between; max-width:190px; }
+  .opts input[type=checkbox] { margin:0; width:15px; height:15px; flex:none; }
+  .opts input[type=text] { border:1px solid var(--bd); border-radius:4px; padding:4px 6px; font-size:13px; }
+  .opts input.w100 { width:110px; } .opts input.w50 { width:110px; }
+  .actions { margin-top:14px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  button { font:inherit; border:1px solid var(--bd); background:#fff; border-radius:5px; padding:7px 14px; cursor:pointer; }
+  button.primary { background:var(--acc); color:#fff; border-color:var(--acc); font-weight:bold; }
+  button:disabled { opacity:.45; cursor:default; }
+  #msg { font-size:13px; color:var(--muted); }
+  #msg.ok { color:#1b7f3b; } #msg.err { color:var(--err); }
+  .result { margin-top:16px; }
+  .stat { font-size:13px; margin-bottom:8px; }
+  .stat b { margin-right:3px; }
+  details { background:#fff; border:1px solid var(--bd); border-radius:6px; padding:8px 12px; margin-bottom:10px; font-size:12.5px; }
+  details summary { cursor:pointer; font-weight:bold; }
+  details ul { margin:6px 0 0; padding-left:18px; max-height:200px; overflow:auto; }
+  .w { color:var(--warn); }
+  #preview { background:#fff; border:1px solid var(--bd); border-radius:6px; padding:18px; overflow:auto; }
+  #preview:focus-within { outline:2px solid #9bbcf0; }
+  .hint { font-size:12px; color:var(--muted); margin:4px 0 8px; }
+  @media (max-width: 900px) { .inputs, .opts { grid-template-columns:1fr; } .optgrp + .optgrp { border-left:0; border-top:1px solid var(--bd); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>신구조문대비표 생성기</h1>
+  <span>현행·개정안을 한글에서 복사(Ctrl+A → Ctrl+C)해 붙여넣으면 대비표를 만듭니다. 인터넷 연결 없이 이 PC 안에서만 처리되며 입력 내용은 저장하지 않습니다.</span>
+</header>
+<main>
+  <div class="inputs">
+    <div class="box">
+      <h2>현행 <small id="cntOld"></small></h2>
+      <textarea id="txtOld" placeholder="현행 규정 전문을 붙여넣으세요.&#10;예)&#10;제1조(목적) 이 규정은 …&#10;제2조(정의) ① …&#10;  1. …"></textarea>
+      <div class="summary" id="sumOld"></div>
+    </div>
+    <div class="box">
+      <h2>개정안 <small id="cntNew"></small></h2>
+      <textarea id="txtNew" placeholder="개정안 전문을 붙여넣으세요."></textarea>
+      <div class="summary" id="sumNew"></div>
+    </div>
+  </div>
+
+  <div class="opts box">
+    <div class="optgrp">
+      <div class="optttl">표 서식</div>
+      <div class="fmt">
+        <label>글꼴 <input type="text" id="optFont" class="w100" value="휴먼명조"></label>
+        <label>크기(pt) <input type="text" id="optSize" class="w50" value="10"></label>
+      </div>
+    </div>
+    <div class="optgrp">
+      <div class="optttl">변경 표시</div>
+      <label><input type="checkbox" id="optUnder" checked> 변경 부분 밑줄</label>
+      <label><input type="checkbox" id="optColor" checked> <span>변경 부분 글씨색 (현행 <b style="color:#FF0000;font-weight:normal">빨강</b> / 개정안 <b style="color:#0000FF;font-weight:normal">파랑</b>)</span></label>
+      <label><input type="checkbox" id="optNote" checked> &lt;단서 신설&gt;·&lt;후단 신설&gt; 표기</label>
+    </div>
+    <div class="optgrp">
+      <div class="optttl">비교 범위</div>
+      <label><input type="checkbox" id="optHeads" checked> 장·절 제목 변경 포함</label>
+      <label><input type="checkbox" id="optRemoved" checked> 개정안에서 없어진 조·항·호도 &lt;삭 제&gt;로 표시</label>
+      <label><input type="checkbox" id="optStrip" checked> &lt;개정 2024. 1. 1.&gt;, [본조신설 …] 같은 연혁 표시 제거</label>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="primary" id="btnGen">대비표 만들기</button>
+    <button id="btnCopy" disabled>표 복사 (한글에 붙여넣기)</button>
+    <button id="btnSave" disabled>한글 파일로 저장 (.hwpx)</button>
+    <button id="btnClear">입력 지우기</button>
+    <span id="msg"></span>
+  </div>
+
+  <div class="result" id="result" hidden>
+    <div class="stat" id="stat"></div>
+    <details id="warnBox" hidden><summary class="w">확인이 필요한 항목 <span id="warnCnt"></span></summary><ul id="warnList"></ul></details>
+    <details id="structBox"><summary>인식한 조문 구조 보기</summary><div id="structList" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px"></div></details>
+    <div class="hint">아래 표는 직접 고칠 수 있습니다. 고친 내용(글자, 색, 밑줄)이 그대로 복사되고 한글 파일로 저장됩니다.</div>
+    <div id="preview" contenteditable="true" spellcheck="false"></div>
+  </div>
+</main>
+
+<script>
+/*__CORE__*/
+</script>
+<script>
+/*__HWPX__*/
+</script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var lastHTML = '', lastTitle = '';
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/^ +/, function (m) { return m.replace(/ /g, '&nbsp;'); })
+      .replace(/ {2,}/g, function (m) { return ' ' + new Array(m.length).join('&nbsp;'); });
+  }
+
+  function opts() {
+    return {
+      stripTags: $('optStrip').checked,
+      includeHeads: $('optHeads').checked,
+      showRemoved: $('optRemoved').checked,
+      clauseNote: $('optNote').checked,
+      underline: true,
+      under: $('optUnder').checked,
+      color: $('optColor').checked
+    };
+  }
+
+  function summarize(doc, el, cntEl, txt) {
+    cntEl.textContent = txt ? txt.split(/\r\n|\r|\n/).length + '줄' : '';
+    if (!txt.trim()) { el.innerHTML = ''; return; }
+    var heads = doc.items.filter(function (x) { return x.type === 'head'; }).length;
+    var h = '조문 <b>' + doc.stats.jo + '</b>개' + (heads ? ', 장·절 ' + heads + '개' : '') +
+      (doc.title ? ' · 제목: <b>' + esc(doc.title) + '</b>' : '');
+    if (!doc.stats.jo) h = '<span class="w">조문(제N조)을 찾지 못했습니다. 붙여넣은 내용을 확인하세요.</span>';
+    if (doc.warnings.length) h += ' · <span class="w">확인 필요 ' + doc.warnings.length + '건</span>';
+    el.innerHTML = h;
+  }
+
+  var RED = '#FF0000', BLUE = '#0000FF';
+
+  // side: 'L' = 현행(빨강), 'R' = 개정안(파랑)
+  function cellHTML(lines, o, side) {
+    var color = side === 'L' ? RED : BLUE;
+    function deco(html) {
+      var st = (o.under ? 'text-decoration:underline;' : '') + (o.color ? 'color:' + color + ';' : '');
+      if (!st) return html;
+      return (o.under ? '<u>' : '') + '<span style="' + st + '">' + html + '</span>' + (o.under ? '</u>' : '');
+    }
+    return lines.map(function (ln) {
+      var body;
+      if (ln.marker) {
+        // <신  설>, <삭  제> 표시는 색만 입힘
+        body = o.color ? '<span style="color:' + color + '">' + esc(ln.text) + '</span>' : esc(ln.text);
+      } else if (ln.segs) {
+        body = ln.segs.map(function (s) { return s.u && s.t.trim() ? deco(esc(s.t)) : esc(s.t); }).join('');
+      } else body = esc(ln.text);
+      if (ln.suffix) body += ' ' + (o.color ? '<span style="color:' + color + '">' + esc(ln.suffix) + '</span>' : esc(ln.suffix));
+      var ind = (ln.indent || 0) * 10;
+      return '<p style="margin:0 0 0 ' + ind + 'pt;line-height:160%;text-align:justify">' + (body || '&nbsp;') + '</p>';
+    }).join('');
+  }
+
+  function tableHTML(res, o, title) {
+    var font = ($('optFont').value || '휴먼명조').replace(/[<>"]/g, '');
+    var size = parseFloat($('optSize').value) || 10;
+    var B = '1px solid #000', N = 'none';
+    var base = 'padding:3pt 5pt;vertical-align:top;width:50%;color:#000000;font-family:\'' + font + '\';font-size:' + size + 'pt;border-left:' + B + ';border-right:' + B + ';';
+    var th = 'border:' + B + ';border-bottom:1.5pt solid #000;padding:4pt 5pt;text-align:center;font-weight:bold;background:#e7e6e6;font-family:\'' + font + '\';font-size:' + (size + 1) + 'pt';
+    var h = '';
+    if (title) h += '<p style="color:#000000;text-align:center;font-family:\'' + font + '\';font-size:' + (size + 6) + 'pt;font-weight:bold;margin:0 0 8pt">' + esc(title) + ' 신구조문대비표</p>';
+    h += '<table style="border-collapse:collapse;width:100%;table-layout:fixed;border:1.5pt solid #000" cellspacing="0" cellpadding="0">';
+    h += '<colgroup><col style="width:50%"><col style="width:50%"></colgroup>';
+    h += '<thead><tr><th style="' + th + '">' + '현 행' + '</th><th style="' + th + '">' + '개 정 안' + '</th></tr></thead><tbody>';
+    var rows = res.rows;
+    function isStart(r) { return !r || r.joStart || r.head; }
+    rows.forEach(function (r, i) {
+      // 조(또는 장·절 제목) 단위로 위아래 검은 선, 조 안의 행 사이는 선 없음
+      var top = isStart(r) ? B : N;
+      var bottom = (i === rows.length - 1 || isStart(rows[i + 1])) ? B : N;
+      var td = base + 'border-top:' + top + ';border-bottom:' + bottom + ';';
+      h += '<tr><td style="' + td + '">' + cellHTML(r.left, o, 'L') + '</td><td style="' + td + '">' + cellHTML(r.right, o, 'R') + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    return h;
+  }
+
+  function structHTML(doc, name) {
+    var h = '<div><b>' + name + '</b><ul>';
+    doc.items.forEach(function (it) {
+      if (it.type === 'head') { h += '<li><b>' + esc(it.label + ' ' + it.text) + '</b></li>'; return; }
+      var cnt = {}; (function rec(n) { n.children.forEach(function (c) { var k = ['조','항','호','목','세목','세목','세목','세목'][c.level]; cnt[k] = (cnt[k] || 0) + 1; rec(c); }); })(it);
+      var parts = Object.keys(cnt).map(function (k) { return k + ' ' + cnt[k]; }).join(', ');
+      h += '<li>' + esc(it.label + it.title) + (it.deleted ? ' <i>(삭제)</i>' : '') + (parts ? ' — ' + parts : '') + '</li>';
+    });
+    return h + '</ul></div>';
+  }
+
+  function generate() {
+    var o = opts();
+    var tOld = $('txtOld').value, tNew = $('txtNew').value;
+    var A = SGCore.parse(tOld, o), B = SGCore.parse(tNew, o);
+    summarize(A, $('sumOld'), $('cntOld'), tOld);
+    summarize(B, $('sumNew'), $('cntNew'), tNew);
+    if (!A.stats.jo || !B.stats.jo) { setMsg('현행과 개정안 모두에서 조문을 찾아야 대비표를 만들 수 있습니다.', 'err'); return; }
+
+    var res = SGCore.compare(A, B, o);
+    var title = B.title || A.title || '';
+    lastTitle = title;
+    if (title && !/^「.*」$/.test(title)) title = '「' + title + '」';
+    lastHTML = tableHTML(res, o, title);
+    $('preview').innerHTML = lastHTML;
+    $('result').hidden = false;
+    var s = res.stat;
+    $('stat').innerHTML = '대비표 <b>' + res.rows.length + '</b>행 · 개정 <b>' + s.mod + '</b>개조 · 신설 <b>' + s.add + '</b>개조 · 삭제 <b>' + s.del + '</b>개조' + (s.head ? ' · 장·절 제목 <b>' + s.head + '</b>건' : '');
+
+    var warns = [];
+    A.warnings.forEach(function (w) { warns.push('[현행] ' + w); });
+    B.warnings.forEach(function (w) { warns.push('[개정안] ' + w); });
+    [[A, '현행'], [B, '개정안']].forEach(function (p) {
+      var noNum = 0;
+      p[0].items.forEach(function rec(n) { if (n.text && n.text.indexOf('\n') >= 0) noNum += n.text.split('\n').length - 1; (n.children || []).forEach(rec); });
+      if (noNum > 20) warns.push('[' + p[1] + '] 번호 없이 이어지는 문단이 ' + noNum + '개입니다. 한글의 자동 문단 번호(①, 1. 등)는 복사할 때 빠질 수 있으니, 원문 번호가 글자로 들어갔는지 확인하세요.');
+    });
+    if (A.items.length === B.items.length && !res.rows.length) warns.push('현행과 개정안 내용이 같습니다.');
+    $('warnBox').hidden = !warns.length;
+    $('warnCnt').textContent = '(' + warns.length + '건)';
+    $('warnList').innerHTML = warns.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('');
+    $('structList').innerHTML = structHTML(A, '현행') + structHTML(B, '개정안');
+
+    $('btnCopy').disabled = $('btnSave').disabled = !res.rows.length;
+    setMsg(res.rows.length ? '대비표를 만들었습니다.' : '변경된 조문이 없습니다.', res.rows.length ? 'ok' : '');
+  }
+
+  function setMsg(t, cls) { var m = $('msg'); m.textContent = t; m.className = cls || ''; }
+
+  function copyTable() {
+    var html = $('preview').innerHTML;
+    var plain = $('preview').innerText;
+    function legacy() {
+      var holder = document.createElement('div');
+      holder.style.cssText = 'position:fixed;left:-99999px;top:0;background:#fff';
+      holder.innerHTML = html;
+      document.body.appendChild(holder);
+      var range = document.createRange(); range.selectNodeContents(holder);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      var ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      sel.removeAllRanges(); document.body.removeChild(holder);
+      return ok;
+    }
+    var done = function (ok) {
+      setMsg(ok ? '복사했습니다. 한글 문서에서 Ctrl+V로 붙여넣으세요.' : '복사하지 못했습니다. 표를 마우스로 선택해 Ctrl+C 하세요.', ok ? 'ok' : 'err');
+    };
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        navigator.clipboard.write([new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([plain], { type: 'text/plain' })
+        })]).then(function () { done(true); }, function () { done(legacy()); });
+        return;
+      }
+    } catch (e) { /* fall through */ }
+    done(legacy());
+  }
+
+  /* ---------- 미리보기 표 → 한글 문서 모델 ---------- */
+  function hexColor(c) {
+    var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c || '');
+    if (!m) return null;
+    var h = '#' + [m[1], m[2], m[3]].map(function (v) { return ('0' + (+v).toString(16)).slice(-2); }).join('').toUpperCase();
+    // 검정에 가까운 색은 기본 글자색으로 처리
+    if (+m[1] < 64 && +m[2] < 64 && +m[3] < 64) return null;
+    return h;
+  }
+  function isUnder(node, stop) {
+    for (var e = node.parentNode; e && e !== stop; e = e.parentNode) {
+      if (e.nodeType !== 1) continue;
+      if (e.tagName === 'U') return true;
+      var d = getComputedStyle(e).textDecorationLine || getComputedStyle(e).textDecoration || '';
+      if (d.indexOf('underline') >= 0) return true;
+    }
+    return false;
+  }
+  function isBold(node) {
+    var e = node.parentNode; if (!e || e.nodeType !== 1) return false;
+    var w = getComputedStyle(e).fontWeight; return w === 'bold' || +w >= 600;
+  }
+  var BLOCK = /^(P|DIV|LI|H[1-6]|TABLE|TR)$/;
+  function cellParas(cell, ptToLevel) {
+    var paras = [], cur = null;
+    function start(indent) { cur = { indent: indent || 0, runs: [] }; paras.push(cur); }
+    function add(t, node) {
+      if (!cur) start(0);
+      var r = { t: t.replace(/ /g, ' '), color: hexColor(getComputedStyle(node.parentNode).color), u: isUnder(node, cell), b: false };
+      var last = cur.runs[cur.runs.length - 1];
+      if (last && last.color === r.color && last.u === r.u && last.b === r.b) last.t += r.t; else cur.runs.push(r);
+    }
+    (function walk(el, indent) {
+      for (var n = el.firstChild; n; n = n.nextSibling) {
+        if (n.nodeType === 3) { if (n.nodeValue) add(n.nodeValue, n); }
+        else if (n.nodeType === 1) {
+          if (n.tagName === 'BR') { start(indent); continue; }
+          if (BLOCK.test(n.tagName)) {
+            var lv = ptToLevel(parseFloat(getComputedStyle(n).marginLeft) || 0);
+            start(lv); walk(n, lv); cur = null;
+          } else walk(n, indent);
+        }
+      }
+    })(cell, 0);
+    paras = paras.filter(function (p, i) { return p.runs.length || i === 0; });
+    paras.forEach(function (p) {
+      // 문단 앞뒤 공백 정리
+      if (p.runs.length) { p.runs[0].t = p.runs[0].t.replace(/^\s+/, ''); var l = p.runs[p.runs.length - 1]; l.t = l.t.replace(/\s+$/, ''); }
+    });
+    return paras;
+  }
+  function previewToDoc() {
+    var pv = $('preview'), tbl = pv.querySelector('table');
+    if (!tbl) return null;
+    var titleP = null;
+    for (var n = pv.firstElementChild; n && n !== tbl; n = n.nextElementSibling) if (n.textContent.trim()) { titleP = n; break; }
+    var size = parseFloat($('optSize').value) || 10;
+    var pxPerLevel = 10 * 96 / 72; // 미리보기 들여쓰기 10pt
+    var toLv = function (px) { return Math.round(px / pxPerLevel); };
+    var heads = Array.prototype.map.call(tbl.querySelectorAll('thead th'), function (th) { return th.textContent.trim(); });
+    var rows = [];
+    Array.prototype.forEach.call(tbl.querySelectorAll('tbody > tr'), function (tr) {
+      var tds = tr.querySelectorAll('td');
+      if (tds.length < 2) return;
+      var cs = getComputedStyle(tds[0]);
+      rows.push({
+        top: cs.borderTopStyle !== 'none' && parseFloat(cs.borderTopWidth) > 0,
+        bottom: cs.borderBottomStyle !== 'none' && parseFloat(cs.borderBottomWidth) > 0,
+        cells: [cellParas(tds[0], toLv), cellParas(tds[1], toLv)]
+      });
+    });
+    return {
+      title: titleP ? titleP.textContent.replace(/ /g, ' ').trim() : '',
+      font: ($('optFont').value || '휴먼명조').trim(), size: size,
+      header: heads.length === 2 ? heads : ['현 행', '개 정 안'], rows: rows
+    };
+  }
+
+  function saveHwpx() {
+    var doc = previewToDoc();
+    if (!doc || !doc.rows.length) { setMsg('저장할 대비표가 없습니다.', 'err'); return; }
+    var bytes = SGHwpx.build(doc);
+    var name = (lastTitle || '신구조문대비표').replace(/[\\\/:*?"<>|「」]/g, '').trim() || '신구조문대비표';
+    var blob = new Blob([bytes], { type: 'application/hwp+zip' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name + '_신구조문대비표.hwpx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+    setMsg('한글 파일(.hwpx)을 저장했습니다. 다운로드 폴더에서 열어 보세요.', 'ok');
+  }
+
+  function live() {
+    var o = opts();
+    ['Old', 'New'].forEach(function (k) {
+      var t = $('txt' + k).value;
+      summarize(SGCore.parse(t, o), $('sum' + k), $('cnt' + k), t);
+    });
+  }
+  var timer = null;
+  ['txtOld', 'txtNew'].forEach(function (id) {
+    $(id).addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(live, 300); });
+  });
+  $('btnGen').addEventListener('click', function () {
+    setMsg('처리 중…');
+    setTimeout(function () {
+      try { generate(); } catch (e) { setMsg('오류: ' + e.message, 'err'); if (window.console) console.error(e); }
+    }, 10);
+  });
+  $('btnCopy').addEventListener('click', copyTable);
+  $('btnSave').addEventListener('click', function () {
+    try { saveHwpx(); } catch (e) { setMsg('한글 파일 저장 오류: ' + e.message, 'err'); if (window.console) console.error(e); }
+  });
+  $('btnClear').addEventListener('click', function () {
+    $('txtOld').value = $('txtNew').value = '';
+    $('result').hidden = true; $('preview').innerHTML = '';
+    $('btnCopy').disabled = $('btnSave').disabled = true;
+    live(); setMsg('');
+  });
+})();
+</script>
+</body>
+</html>
